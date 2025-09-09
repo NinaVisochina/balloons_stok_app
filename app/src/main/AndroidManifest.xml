@@ -1,5 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:name="ua.kulky.stok.ui.App"
+        android:label="Balloons Stock"
+        android:theme="@style/Theme.BalloonsStock">
+        <activity
+            android:name="ua.kulky.stok.ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+
+<!-- <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
         android:name=".ui.App"
         android:label="Balloons Stock"
         android:theme="@style/Theme.BalloonsStock">
@@ -12,5 +28,5 @@
             </intent-filter>
         </activity>
     </application>
-</manifest>
+</manifest> -->
 

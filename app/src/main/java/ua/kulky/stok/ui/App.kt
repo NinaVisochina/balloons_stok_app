@@ -1,10 +1,11 @@
-package ua.kulky.stock.ui
+package ua.kulky.stok.ui
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import ua.kulky.stock.data.db.AppDatabase
-import ua.kulky.stock.repo.BalloonRepository
+import ua.kulky.stok.data.db.AppDatabase
+import ua.kulky.stok.repo.BalloonRepository
+import ua.kulky.stok.util.CrashLogger
 
 class App : Application() {
     lateinit var repository: BalloonRepository
@@ -12,6 +13,7 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLogger.init(this)
         val db = AppDatabase.get(this)
         repository = BalloonRepository(db.balloonDao(), db.stockInDao(), db.saleDao())
     }

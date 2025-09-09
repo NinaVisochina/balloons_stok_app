@@ -1,4 +1,4 @@
-package com.example.uakulkystock
+/* package com.example.uakulkystock
 
 import org.junit.Test
 
@@ -14,4 +14,4 @@ class ExampleUnitTest {
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)
     }
-}
+} */

@@ -1,1 +1,4 @@
-"# balloons_stok_app" 
+"# balloons_stock_app" 
+
+gradlew assembleDebug
+

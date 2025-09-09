@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "ua.kulky.stock"
+    namespace = "ua.kulky.stok"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "ua.kulky.stock"
+        applicationId = "ua.kulky.stok"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -25,6 +25,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true 
     }
 
     // (можна залишити як дублювання до jvmToolchain)
@@ -75,4 +76,6 @@ dependencies {
 
     // Material (ресурсні стилі для теми)
     implementation("com.google.android.material:material:1.12.0")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

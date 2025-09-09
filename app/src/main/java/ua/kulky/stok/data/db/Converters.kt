@@ -1,4 +1,4 @@
-package ua.kulky.stock.data.db
+package ua.kulky.stok.data.db
 
 import androidx.room.TypeConverter
 import java.time.LocalDate

@@ -1,16 +1,16 @@
-package ua.kulky.stock.data.db
+package ua.kulky.stok.data.db
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import ua.kulky.stock.data.dao.BalloonDao
-import ua.kulky.stock.data.dao.SaleDao
-import ua.kulky.stock.data.dao.StockInDao
-import ua.kulky.stock.data.entities.Balloon
-import ua.kulky.stock.data.entities.Sale
-import ua.kulky.stock.data.entities.StockIn
+import ua.kulky.stok.data.dao.BalloonDao
+import ua.kulky.stok.data.dao.SaleDao
+import ua.kulky.stok.data.dao.StockInDao
+import ua.kulky.stok.data.entities.Balloon
+import ua.kulky.stok.data.entities.Sale
+import ua.kulky.stok.data.entities.StockIn
 
 @Database(
     entities = [Balloon::class, StockIn::class, Sale::class],

@@ -1,8 +1,8 @@
-package ua.kulky.stock.data.dao
+package ua.kulky.stok.data.dao
 
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
-import ua.kulky.stock.data.entities.Balloon
+import ua.kulky.stok.data.entities.Balloon
 
 @Dao
 interface BalloonDao {

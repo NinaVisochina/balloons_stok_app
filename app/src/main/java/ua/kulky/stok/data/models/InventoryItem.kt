@@ -1,4 +1,4 @@
-package ua.kulky.stock.data.models
+package ua.kulky.stok.data.models
 
 data class InventoryItem(
     val balloonId: Long,

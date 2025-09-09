@@ -1,4 +1,4 @@
-package ua.kulky.stock.data.entities
+package ua.kulky.stok.data.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

@@ -1,4 +1,4 @@
-package ua.kulky.stock.ui.screens
+package ua.kulky.stok.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,7 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import ua.kulky.stock.data.models.InventoryItem
+import ua.kulky.stok.data.models.InventoryItem
 import java.text.NumberFormat
 
 @Composable
