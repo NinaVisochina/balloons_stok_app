@@ -36,10 +36,12 @@ class MainActivity : ComponentActivity() {
 
     // Безпечна фабрика: якщо App не підхопився, збираємо репозиторій вручну
     private val vm: MainViewModel by viewModels {
-        val repo = (application as? App)?.repository ?: run {
-            val db = AppDatabase.get(applicationContext)
-            BalloonRepository(db.balloonDao(), db.stockInDao(), db.saleDao())
-        }
+        val repo =
+                (application as? App)?.repository
+                        ?: run {
+                            val db = AppDatabase.get(applicationContext)
+                            BalloonRepository(db.balloonDao(), db.stockInDao(), db.saleDao())
+                        }
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -64,35 +66,32 @@ fun AppScaffold(state: UiState, vm: MainViewModel) {
     val currentRoute = backStackEntry?.destination?.route
 
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = currentRoute == "inventory",
-                    onClick = { navController.navigateSingleTopTo("inventory") },
-                    label = { Text("Залишки") },
-                    icon = { Icon(Icons.Filled.List, contentDescription = "Залишки") }
-                )
-                NavigationBarItem(
-                    selected = currentRoute == "stockin",
-                    onClick = { navController.navigateSingleTopTo("stockin") },
-                    label = { Text("Прихід") },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = "Прихід") }
-                )
-                NavigationBarItem(
-                    selected = currentRoute == "sale",
-                    onClick = { navController.navigateSingleTopTo("sale") },
-                    label = { Text("Продаж") },
-                    icon = { Icon(Icons.Filled.ShoppingCart, contentDescription = "Продаж") }
-                )
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                            selected = currentRoute == "inventory",
+                            onClick = { navController.navigateSingleTopTo("inventory") },
+                            label = { Text("Залишки") },
+                            icon = { Icon(Icons.Filled.List, contentDescription = "Залишки") }
+                    )
+                    NavigationBarItem(
+                            selected = currentRoute == "stockin",
+                            onClick = { navController.navigateSingleTopTo("stockin") },
+                            label = { Text("Прихід") },
+                            icon = { Icon(Icons.Filled.Add, contentDescription = "Прихід") }
+                    )
+                    NavigationBarItem(
+                            selected = currentRoute == "sale",
+                            onClick = { navController.navigateSingleTopTo("sale") },
+                            label = { Text("Продаж") },
+                            icon = {
+                                Icon(Icons.Filled.ShoppingCart, contentDescription = "Продаж")
+                            }
+                    )
+                }
             }
-        }
     ) { padding ->
-        AppNavHost(
-            navController = navController,
-            padding = padding,
-            state = state,
-            vm = vm
-        )
+        AppNavHost(navController = navController, padding = padding, state = state, vm = vm)
     }
 }
 
@@ -106,34 +105,39 @@ private fun NavHostController.navigateSingleTopTo(route: String) {
 
 @Composable
 private fun AppNavHost(
-    navController: NavHostController,
-    padding: PaddingValues,
-    state: UiState,
-    vm: MainViewModel
+        navController: NavHostController,
+        padding: PaddingValues,
+        state: UiState,
+        vm: MainViewModel
 ) {
     NavHost(
-        navController = navController,
-        startDestination = "inventory",
-        modifier = Modifier.padding(padding)
+            navController = navController,
+            startDestination = "inventory",
+            modifier = Modifier.padding(padding)
     ) {
         composable("inventory") {
-            InventoryScreen(state.inventory)
+            InventoryScreen(
+                    items = state.inventory,
+                    onEditBalloon = vm::editBalloon,
+                    onDeleteBalloon = vm::removeBalloon
+            )
         }
         composable("stockin") {
             StockInScreen(
-                balloons = state.balloons,
-                items = state.stockIns,
-                onAdd = vm::addStock,
-                onAddBalloon = vm::addBalloon,
-                onFilter = vm::setStockInFilter
+                    items = state.stockIns,
+                    onAddSmart = vm::addStockSmart,
+                    onFilter = vm::setStockInFilter,
+                    onEdit = vm::editStockIn,
+                    onDelete = vm::removeStockIn
             )
         }
         composable("sale") {
             SaleScreen(
-                balloons = state.balloons,
-                items = state.sales,
-                onSale = vm::addSale,
-                onFilter = vm::setSaleFilter
+                    items = state.sales,
+                    onSaleSmart = vm::addSaleSmart,
+                    onFilter = vm::setSaleFilter,
+                    onEdit = vm::editSale,
+                    onDelete = vm::removeSale
             )
         }
     }

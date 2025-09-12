@@ -2,94 +2,129 @@ package ua.kulky.stok.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import java.time.LocalDate
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ua.kulky.stok.data.entities.Balloon
-import ua.kulky.stok.data.models.*
 import ua.kulky.stok.data.models.InventoryItem
+import ua.kulky.stok.data.models.OperationFilter
+import ua.kulky.stok.data.models.SaleItem
+import ua.kulky.stok.data.models.StockInItem
 import ua.kulky.stok.repo.BalloonRepository
+import java.time.LocalDate
 
 data class UiState(
-        val balloons: List<Balloon> = emptyList(),
-        val inventory: List<InventoryItem> = emptyList(),
-        val stockIns: List<StockInItem> = emptyList(), // історія приходу
-        val sales: List<SaleItem> = emptyList(), // історія продажів
-        val error: String? = null
+    val balloons: List<Balloon> = emptyList(),
+    val inventory: List<InventoryItem> = emptyList(),
+    val stockIns: List<StockInItem> = emptyList(),
+    val sales: List<SaleItem> = emptyList()
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(private val repo: BalloonRepository) : ViewModel() {
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    private val _customerFilter = MutableStateFlow<String?>(null)
-    val salesByCustomer = _customerFilter.flatMapLatest { repo.observeSalesByCustomer(it) }
-
-    private val _inFilter = MutableStateFlow(OperationFilter())
-    private val _saleFilter = MutableStateFlow(OperationFilter())
+    // Поточні фільтри для приходу та продажів
+    private val _inFilter = MutableStateFlow(
+        OperationFilter(
+            dateFrom = null, dateTo = null,
+            customer = null, code = null, size = null, color = null
+        )
+    )
+    private val _saleFilter = MutableStateFlow(
+        OperationFilter(
+            dateFrom = null, dateTo = null,
+            customer = null, code = null, size = null, color = null
+        )
+    )
 
     init {
+        // Балони
         viewModelScope.launch {
-            // Балони + залишки
-            repo.observeBalloons().collect { list ->
-                _state.update { it.copy(balloons = list) }
-                val inv = repo.observeInventory().first()
+            repo.observeBalloons().collect { balloons ->
+                _state.update { it.copy(balloons = balloons) }
+            }
+        }
+        // Залишки
+        viewModelScope.launch {
+            repo.observeInventory().collect { inv ->
                 _state.update { it.copy(inventory = inv) }
             }
         }
+        // Прихід із фільтром
         viewModelScope.launch {
-            _inFilter.collect { f ->
-                repo.observeStockInFiltered(f).collect { items ->
-                    _state.update { it.copy(stockIns = items) }
-                }
-            }
+            _inFilter.flatMapLatest { f -> repo.observeStockInFiltered(f) }
+                .collect { list -> _state.update { it.copy(stockIns = list) } }
         }
+        // Продаж із фільтром (тут і фільтр за покупцем!)
         viewModelScope.launch {
-            _saleFilter.collect { f ->
-                repo.observeSalesFiltered(f).collect { items ->
-                    _state.update { it.copy(sales = items) }
-                }
-            }
+            _saleFilter.flatMapLatest { f -> repo.observeSalesFiltered(f) }
+                .collect { list -> _state.update { it.copy(sales = list) } }
         }
     }
-    fun setStockInFilter(f: OperationFilter) {
-        _inFilter.value = f
-    }
-    fun setSaleFilter(f: OperationFilter) {
-        _saleFilter.value = f
-    }
 
-    fun setCustomerFilter(query: String?) {
-        _customerFilter.value = query?.ifBlank { null }
+    // ----------- Публічні дії для UI -----------
+
+    fun setStockInFilter(filter: OperationFilter) {
+        _inFilter.value = filter
     }
 
-    fun addBalloon(code: String, size: String, color: String, price: Double) =
-            viewModelScope.launch {
-                try {
-                    repo.addBalloon(Balloon(code = code, size = size, color = color, price = price))
-                    refreshInventory()
-                } catch (e: Exception) {
-                    _state.update { it.copy(error = e.message) }
-                }
-            }
+    fun setSaleFilter(filter: OperationFilter) {
+        _saleFilter.value = filter
+    }
 
-    fun addStock(balloonId: Long, qty: Int, date: LocalDate) =
-            viewModelScope.launch {
-                repo.addStockIn(balloonId, qty, date)
-                refreshInventory()
-            }
+    fun addStockSmart(
+        code: String, size: String, color: String, price: Double, qty: Int, date: LocalDate
+    ) = viewModelScope.launch {
+        repo.addStockSmart(code, size, color, price, qty, date)
+        refreshInventory()
+    }
 
-    fun addSale(balloonId: Long, qty: Int, customer: String, date: LocalDate) =
-            viewModelScope.launch {
-                repo.addSale(balloonId, qty, customer, date)
-                refreshInventory()
-            }
+    fun addSaleSmart(
+        code: String, size: String, color: String, price: Double, qty: Int,
+        customer: String, date: LocalDate
+    ) = viewModelScope.launch {
+        repo.addSaleSmart(code, size, color, price, qty, customer, date)
+        refreshInventory()
+    }
 
-    private fun refreshInventory() =
-            viewModelScope.launch {
-                val inv = repo.observeInventory().first()
-                _state.update { it.copy(inventory = inv) }
-            }
+    fun editStockIn(id: Long, qty: Int, date: LocalDate) = viewModelScope.launch {
+        repo.updateStockIn(id, qty, date)
+        refreshInventory()
+    }
+
+    fun removeStockIn(id: Long) = viewModelScope.launch {
+        repo.deleteStockIn(id)
+        refreshInventory()
+    }
+
+    fun editSale(id: Long, qty: Int, customer: String, date: LocalDate) = viewModelScope.launch {
+        repo.updateSale(id, qty, customer, date)
+        refreshInventory()
+    }
+
+    fun removeSale(id: Long) = viewModelScope.launch {
+        repo.deleteSale(id)
+        refreshInventory()
+    }
+
+    fun editBalloon(balloonId: Long, code: String, size: String, color: String, price: Double) =
+        viewModelScope.launch {
+            repo.updateBalloon(balloonId, code, size, color, price)
+            refreshInventory()
+        }
+
+    fun removeBalloon(balloonId: Long) = viewModelScope.launch {
+        repo.deleteBalloonCascade(balloonId)
+        refreshInventory()
+    }
+
+    private fun refreshInventory() {
+        // Залишимо порожнім: потік observeInventory() сам оновить state
+        // Але цей метод зручно викликати після змін для симетрії.
+    }
 }
