@@ -7,44 +7,36 @@ plugins {
 
 android {
     namespace = "ua.kulky.stok"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "ua.kulky.stok"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.1"
     }
 
-    buildFeatures {
-        compose = true
-    }
+    buildFeatures { compose = true }
 
-    // Вирівнюємо Java до 17
+    // Java 17 + desugaring
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        isCoreLibraryDesugaringEnabled = true 
+        isCoreLibraryDesugaringEnabled = true
     }
 
-    // (можна залишити як дублювання до jvmToolchain)
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    // (необов’язково, але ок) дублюємо для Kotlin
+    kotlinOptions { jvmTarget = "17" }
 
-    packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-    }
+    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
-// Вирівнюємо Kotlin до 17 (Kotlin 2.0 рекомендує toolchain)
-kotlin {
-    jvmToolchain(17)
-}
+// Рекомендовано для Kotlin 2.x
+kotlin { jvmToolchain(17) }
 
 dependencies {
-    // Compose BOM
+    // Compose BOM — керує версіями всіх Compose-артефактів
     val composeBom = platform("androidx.compose:compose-bom:2024.08.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -54,9 +46,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.compose.material3:material3:1.3.0")
+    implementation("androidx.compose.material3:material3") // без версії — бере з BOM
     implementation("androidx.compose.material:material-icons-extended")
-
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.0")
@@ -77,5 +68,6 @@ dependencies {
     // Material (ресурсні стилі для теми)
     implementation("com.google.android.material:material:1.12.0")
 
+    // Desugaring для Java 8+ API на старих SDK
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

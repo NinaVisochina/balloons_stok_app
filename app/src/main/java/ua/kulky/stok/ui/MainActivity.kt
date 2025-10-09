@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -34,19 +35,14 @@ import ua.kulky.stok.ui.screens.StockInScreen
 
 class MainActivity : ComponentActivity() {
 
-    // Безпечна фабрика: якщо App не підхопився, збираємо репозиторій вручну
     private val vm: MainViewModel by viewModels {
-        val repo =
-                (application as? App)?.repository
-                        ?: run {
-                            val db = AppDatabase.get(applicationContext)
-                            BalloonRepository(db.balloonDao(), db.stockInDao(), db.saleDao())
-                        }
+        val repo = (application as? App)?.repository ?: run {
+            val db = AppDatabase.get(applicationContext)
+            BalloonRepository(db.balloonDao(), db.stockInDao(), db.saleDao())
+        }
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return MainViewModel(repo) as T
-            }
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(repo) as T
         }
     }
 
@@ -61,37 +57,50 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppScaffold(state: UiState, vm: MainViewModel) {
-    val navController = rememberNavController() // ЄДИНИЙ контролер
+    val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // Списки для автопідказок
+    val knownCodes = remember(state.balloons) { state.balloons.map { it.code }.distinct().sorted() }
+    val knownSizes = remember(state.balloons) { state.balloons.map { it.size }.distinct().sorted() }
+    val knownColors = remember(state.balloons) { state.balloons.map { it.color }.distinct().sorted() }
+    val knownCustomers = remember(state.sales) { state.sales.map { it.customer }.distinct().sorted() }
+
     Scaffold(
-            bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(
-                            selected = currentRoute == "inventory",
-                            onClick = { navController.navigateSingleTopTo("inventory") },
-                            label = { Text("Залишки") },
-                            icon = { Icon(Icons.Filled.List, contentDescription = "Залишки") }
-                    )
-                    NavigationBarItem(
-                            selected = currentRoute == "stockin",
-                            onClick = { navController.navigateSingleTopTo("stockin") },
-                            label = { Text("Прихід") },
-                            icon = { Icon(Icons.Filled.Add, contentDescription = "Прихід") }
-                    )
-                    NavigationBarItem(
-                            selected = currentRoute == "sale",
-                            onClick = { navController.navigateSingleTopTo("sale") },
-                            label = { Text("Продаж") },
-                            icon = {
-                                Icon(Icons.Filled.ShoppingCart, contentDescription = "Продаж")
-                            }
-                    )
-                }
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = currentRoute == "inventory",
+                    onClick = { navController.navigateSingleTopTo("inventory") },
+                    label = { Text("Залишки") },
+                    icon = { Icon(Icons.Filled.List, contentDescription = "Залишки") }
+                )
+                NavigationBarItem(
+                    selected = currentRoute == "stockin",
+                    onClick = { navController.navigateSingleTopTo("stockin") },
+                    label = { Text("Прихід") },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = "Прихід") }
+                )
+                NavigationBarItem(
+                    selected = currentRoute == "sale",
+                    onClick = { navController.navigateSingleTopTo("sale") },
+                    label = { Text("Продаж") },
+                    icon = { Icon(Icons.Filled.ShoppingCart, contentDescription = "Продаж") }
+                )
             }
+        }
     ) { padding ->
-        AppNavHost(navController = navController, padding = padding, state = state, vm = vm)
+        AppNavHost(
+            navController = navController,
+            padding = padding,
+            state = state,
+            vm = vm,
+            knownCodes = knownCodes,
+            knownSizes = knownSizes,
+            knownColors = knownColors,
+            knownCustomers = knownCustomers
+        )
     }
 }
 
@@ -105,39 +114,50 @@ private fun NavHostController.navigateSingleTopTo(route: String) {
 
 @Composable
 private fun AppNavHost(
-        navController: NavHostController,
-        padding: PaddingValues,
-        state: UiState,
-        vm: MainViewModel
+    navController: NavHostController,
+    padding: PaddingValues,
+    state: UiState,
+    vm: MainViewModel,
+    knownCodes: List<String>,
+    knownSizes: List<String>,
+    knownColors: List<String>,
+    knownCustomers: List<String>
 ) {
     NavHost(
-            navController = navController,
-            startDestination = "inventory",
-            modifier = Modifier.padding(padding)
+        navController = navController,
+        startDestination = "inventory",
+        modifier = Modifier.padding(padding)
     ) {
         composable("inventory") {
             InventoryScreen(
-                    items = state.inventory,
-                    onEditBalloon = vm::editBalloon,
-                    onDeleteBalloon = vm::removeBalloon
+                items = state.inventory,
+                onEditBalloon = vm::editBalloon,
+                onDeleteBalloon = vm::removeBalloon
             )
         }
         composable("stockin") {
             StockInScreen(
-                    items = state.stockIns,
-                    onAddSmart = vm::addStockSmart,
-                    onFilter = vm::setStockInFilter,
-                    onEdit = vm::editStockIn,
-                    onDelete = vm::removeStockIn
+                items = state.stockIns,
+                onAddSmart = vm::addStockSmart,
+                onFilter = vm::setStockInFilter,
+                onEdit = vm::editStockIn,
+                onDelete = vm::removeStockIn,
+                codes = knownCodes,
+                sizes = knownSizes,
+                colors = knownColors
             )
         }
         composable("sale") {
             SaleScreen(
-                    items = state.sales,
-                    onSaleSmart = vm::addSaleSmart,
-                    onFilter = vm::setSaleFilter,
-                    onEdit = vm::editSale,
-                    onDelete = vm::removeSale
+                items = state.sales,
+                onSaleSmart = vm::addSaleSmart,
+                onFilter = vm::setSaleFilter,
+                onEdit = vm::editSale,
+                onDelete = vm::removeSale,
+                codes = knownCodes,
+                sizes = knownSizes,
+                colors = knownColors,
+                customers = knownCustomers
             )
         }
     }
