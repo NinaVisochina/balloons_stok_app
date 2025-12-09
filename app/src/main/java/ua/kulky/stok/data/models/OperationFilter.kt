@@ -8,5 +8,6 @@ data class OperationFilter(
     val customer: String? = null, // тільки для продажів (ігнорується в приході)
     val code: String? = null,
     val size: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    val manufacturer: String? = null
 )

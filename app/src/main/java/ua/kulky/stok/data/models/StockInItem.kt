@@ -9,5 +9,6 @@ data class StockInItem(
     val code: String,
     val size: String,
     val color: String,
-    val price: Double
+    val price: Double,
+    val manufacturer: String
 )

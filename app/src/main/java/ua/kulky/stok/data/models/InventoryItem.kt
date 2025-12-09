@@ -7,7 +7,8 @@ data class InventoryItem(
     val color: String,
     val price: Double,
     val qtyIn: Int,
-    val qtyOut: Int
+    val qtyOut: Int,
+    val manufacturer: String
 ) {
     val stock: Int get() = qtyIn - qtyOut
 }

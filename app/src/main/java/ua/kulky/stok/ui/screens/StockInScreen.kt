@@ -1,19 +1,34 @@
 package ua.kulky.stok.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.YearMonth
@@ -36,144 +51,217 @@ fun StockInScreen(
                         color: String,
                         price: Double,
                         qty: Int,
-                        date: LocalDate) -> Unit,
+                        date: LocalDate,
+                        manufacturer: String) -> Unit,
         onFilter: (OperationFilter) -> Unit,
         onEdit: (id: Long, qty: Int, date: LocalDate) -> Unit,
         onDelete: (id: Long) -> Unit,
         codes: List<String>,
         sizes: List<String>,
-        colors: List<String>
+        colors: List<String>,
+        manufacturers: List<String>
 ) {
+    // -------- стан форми введення --------
     var code by remember { mutableStateOf("") }
     var size by remember { mutableStateOf("") }
     var color by remember { mutableStateOf("") }
+    var manufacturer by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("") }
-    var dateStr by remember { mutableStateOf(LocalDate.now().toString()) }
+    var date by remember { mutableStateOf(LocalDate.now()) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
+    // -------- стан фільтра --------
     var showFilter by remember { mutableStateOf(false) }
     var fDateFrom by remember { mutableStateOf<LocalDate?>(null) }
     var fDateTo by remember { mutableStateOf<LocalDate?>(null) }
     var fCode by remember { mutableStateOf("") }
     var fSize by remember { mutableStateOf("") }
     var fColor by remember { mutableStateOf("") }
+    var fManufacturer by remember { mutableStateOf("") }
+
+    // -------- режим: історія / додавання --------
+    var isAdding by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
-    LaunchedEffect(items.size) { if (items.isNotEmpty()) listState.scrollToItem(0) }
+    LaunchedEffect(items.size) {
+        if (items.isNotEmpty() && !isAdding) {
+            listState.scrollToItem(0)
+        }
+    }
 
-    // Для згортання по місяцях/днях
     val monthExpanded = remember { mutableStateMapOf<YearMonth, Boolean>() }
     val dayExpanded = remember { mutableStateMapOf<LocalDate, Boolean>() }
     val byMonth: Map<YearMonth, List<StockInItem>> =
             remember(items) {
                 items.groupBy { YearMonth.from(it.date) }.toSortedMap(compareByDescending { it })
             }
-    LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { Text("Прихід", style = MaterialTheme.typography.titleLarge) }
 
-        // Форма з автопідказками
-        item {
-            AutoCompleteTextField(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = "Код",
-                    suggestions = codes
-            )
-        }
-        item {
-            AutoCompleteTextField(
-                    value = size,
-                    onValueChange = { size = it },
-                    label = "Розмір",
-                    suggestions = sizes
-            )
-        }
-        item {
-            AutoCompleteTextField(
-                    value = color,
-                    onValueChange = { color = it },
-                    label = "Колір",
-                    suggestions = colors
-            )
-        }
-        item {
-            OutlinedTextField(
-                    value = price,
-                    onValueChange = { price = it },
-                    label = { Text("Ціна") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-            OutlinedTextField(
-                    value = qty,
-                    onValueChange = { qty = it },
-                    label = { Text("Кількість") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-            )
-        }
-        // Поле дати введення (залишимо як текст — календар просили саме у фільтрі)
-        item {
-            OutlinedTextField(
-                    value = dateStr,
-                    onValueChange = { dateStr = it },
-                    label = { Text("Дата (yyyy-MM-dd)") },
-                    modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-            Button(
-                    enabled =
-                            code.isNotBlank() &&
-                                    size.isNotBlank() &&
-                                    color.isNotBlank() &&
-                                    (qty.toIntOrNull() ?: 0) > 0,
-                    onClick = {
-                        val p = price.toDoubleOrNull() ?: 0.0
-                        val q = qty.toIntOrNull() ?: 0
-                        val d =
-                                runCatching { LocalDate.parse(dateStr) }
-                                        .getOrDefault(LocalDate.now())
-                        onAddSmart(code.trim(), size.trim(), color.trim(), p, q, d)
-                        qty = "" // зручно серіями
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+                modifier =
+                        Modifier.fillMaxSize()
+                                .imePadding() // ✅ відступ під клавіатуру
+                                .navigationBarsPadding(), // ✅ щоб низ не ховався під системні
+                // кнопки
+                state = listState,
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { Text("Прихід", style = MaterialTheme.typography.titleLarge) }
+
+            if (isAdding) {
+                // ---------- РЕЖИМ ДОДАВАННЯ ----------
+                item {
+                    Button(onClick = { isAdding = false }) {
+                        Text("Повернутися до історії приходу")
                     }
-            ) { Text("Зберегти прихід") }
-        }
+                }
 
-        item { Button(onClick = { showFilter = true }) { Text("Фільтр") } }
+                // Форма з автопідказками
+                item {
+                    AutoCompleteTextField(
+                            value = code,
+                            onValueChange = { code = it },
+                            label = "Код",
+                            suggestions = codes
+                    )
+                }
+                item {
+                    AutoCompleteTextField(
+                            value = size,
+                            onValueChange = { size = it },
+                            label = "Розмір",
+                            suggestions = sizes
+                    )
+                }
+                item {
+                    AutoCompleteTextField(
+                            value = color,
+                            onValueChange = { color = it },
+                            label = "Колір",
+                            suggestions = colors
+                    )
+                }
+                item {
+                    AutoCompleteTextField(
+                            value = manufacturer,
+                            onValueChange = { manufacturer = it },
+                            label = "Виробник",
+                            suggestions = manufacturers
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                            value = price,
+                            onValueChange = { price = it },
+                            label = { Text("Ціна") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                            value = qty,
+                            onValueChange = { qty = it },
+                            label = { Text("Кількість") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                item { DateField(label = "Дата", date = date, onClick = { showDatePicker = true }) }
 
-        item { HorizontalDivider() }
-        item { Text("Історія приходу", style = MaterialTheme.typography.titleMedium) }
+                item {
+                    Button(
+                            enabled = (qty.toIntOrNull() ?: 0) > 0,
+                            onClick = {
+                                val p = price.toDoubleOrNull() ?: 0.0
+                                val q = qty.toIntOrNull() ?: 0
+                                val d = date
+                                onAddSmart(
+                                        code.trim(),
+                                        size.trim(),
+                                        color.trim(),
+                                        p,
+                                        q,
+                                        d,
+                                        manufacturer.trim()
+                                )
+                                // обнуляємо поля
+                                code = ""
+                                size = ""
+                                color = ""
+                                manufacturer = ""
+                                price = ""
+                                qty = ""
+                                date = LocalDate.now()
+                            }
+                    ) { Text("Зберегти прихід") }
+                }
+                item {
+                    Spacer(Modifier.height(400.dp)) // можеш змінити на 320.dp / 480.dp, по відчуттю
+                }
+            } else {
+                // ---------- РЕЖИМ ІСТОРІЇ ----------
+                item { Button(onClick = { isAdding = true }) { Text("Додати прихід") } }
 
-        // Групування: місяць -> день
+                item { Button(onClick = { showFilter = true }) { Text("Фільтр") } }
 
-        byMonth.forEach { (ym, monthItems) ->
-            item(key = "m-$ym") {
-                val expanded = monthExpanded.getOrPut(ym) { false }
-                MonthHeader(ym, expanded) { monthExpanded[ym] = !expanded }
+                item { HorizontalDivider() }
+                item { Text("Історія приходу", style = MaterialTheme.typography.titleMedium) }
+
+                byMonth.forEach { (ym, monthItems) ->
+                    item(key = "m-$ym") {
+                        val mExpanded = monthExpanded.getOrPut(ym) { false }
+                        MonthHeader(ym, mExpanded) { monthExpanded[ym] = !mExpanded }
+                    }
+
+                    if (monthExpanded[ym] == true) {
+                        val byDay =
+                                monthItems
+                                        .groupBy { it.date }
+                                        .toSortedMap(compareByDescending { it })
+                        byDay.forEach { (day, dayItems) ->
+                            item(key = "d-$day") {
+                                val dExpanded = dayExpanded.getOrPut(day) { false }
+                                DayHeader(day, dExpanded) { dayExpanded[day] = !dExpanded }
+                            }
+                            if (dayExpanded[day] == true) {
+                                items(dayItems, key = { it.id }) { e ->
+                                    HistoryCardStockIn(e, onEdit = onEdit, onDelete = onDelete)
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            val byDay = monthItems.groupBy { it.date }.toSortedMap(compareByDescending { it })
-            byDay.forEach { (day, dayItems) ->
-                item(key = "d-$day") {
-                    val expanded = dayExpanded.getOrPut(day) { false }
-                    DayHeader(day, expanded) { dayExpanded[day] = !expanded }
+        }
+
+        // 🔹 бігунок справа
+        LazyListScrollbar(
+                listState = listState,
+                modifier =
+                        Modifier.align(Alignment.CenterEnd)
+                                .padding(vertical = 8.dp, horizontal = 2.dp)
+        )
+    }
+    if (showDatePicker) {
+        DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = { TextButton(onClick = { showDatePicker = false }) { Text("OK") } },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("Скасувати") }
                 }
-                if (dayExpanded[day] == true) {
-                    items(dayItems, key = { it.id }) { e ->
-                        HistoryCardStockIn(e, onEdit = onEdit, onDelete = onDelete)
-                    }
-                }
+        ) {
+            val state = rememberDatePickerState(initialSelectedDateMillis = date.toEpochMilli())
+            DatePicker(state = state)
+            LaunchedEffect(state.selectedDateMillis) {
+                state.selectedDateMillis?.toLocalDate()?.let { picked -> date = picked }
             }
         }
     }
 
+    // ⬇⬇⬇ Далі – як і було, діалог лишається всередині StockInScreen
     if (showFilter) {
         FilterDialogStockIn(
                 initialFrom = fDateFrom,
@@ -181,13 +269,15 @@ fun StockInScreen(
                 initialCode = fCode,
                 initialSize = fSize,
                 initialColor = fColor,
+                initialManufacturer = fManufacturer,
                 onDismiss = { showFilter = false },
-                onApply = { from, to, codeF, sizeF, colorF ->
+                onApply = { from, to, codeF, sizeF, colorF, manufacturerF ->
                     fDateFrom = from
                     fDateTo = to
                     fCode = codeF
                     fSize = sizeF
                     fColor = colorF
+                    fManufacturer = manufacturerF
                     onFilter(
                             OperationFilter(
                                     dateFrom = from,
@@ -195,14 +285,16 @@ fun StockInScreen(
                                     code = codeF.ifBlank { null },
                                     size = sizeF.ifBlank { null },
                                     color = colorF.ifBlank { null },
-                                    customer = null
+                                    customer = null,
+                                    manufacturer = manufacturerF.ifBlank { null }
                             )
                     )
                     showFilter = false
                 },
                 codes = codes,
                 sizes = sizes,
-                colors = colors
+                colors = colors,
+                manufacturers = manufacturers
         )
     }
 }
@@ -216,7 +308,12 @@ fun HistoryCardStockIn(
     Card {
         Box(Modifier.fillMaxWidth().padding(12.dp)) {
             Column(Modifier.fillMaxWidth().padding(end = 80.dp)) {
-                Text("${e.code} • ${e.size} • ${e.color}")
+                Text(
+                        buildString {
+                            append("${e.code} • ${e.size} • ${e.color}")
+                            if (e.manufacturer.isNotBlank()) append(" • ${e.manufacturer}")
+                        }
+                )
                 Text("Ціна: ${e.price}  Кількість: ${e.qty}")
                 Text("Дата: ${e.date}")
             }
@@ -307,6 +404,7 @@ fun FilterDialogStockIn(
         initialCode: String,
         initialSize: String,
         initialColor: String,
+        initialManufacturer: String,
         onDismiss: () -> Unit,
         onApply:
                 (
@@ -314,16 +412,19 @@ fun FilterDialogStockIn(
                         to: LocalDate?,
                         code: String,
                         size: String,
-                        color: String) -> Unit,
+                        color: String,
+                        manufacturer: String) -> Unit,
         codes: List<String>,
         sizes: List<String>,
-        colors: List<String>
+        colors: List<String>,
+        manufacturers: List<String>
 ) {
     var from by remember { mutableStateOf(initialFrom) }
     var to by remember { mutableStateOf(initialTo) }
     var code by remember { mutableStateOf(initialCode) }
     var size by remember { mutableStateOf(initialSize) }
     var color by remember { mutableStateOf(initialColor) }
+    var manufacturer by remember { mutableStateOf(initialManufacturer) }
 
     var showFromPicker by remember { mutableStateOf(false) }
     var showToPicker by remember { mutableStateOf(false) }
@@ -331,7 +432,7 @@ fun FilterDialogStockIn(
     AlertDialog(
             onDismissRequest = onDismiss,
             confirmButton = {
-                TextButton(onClick = { onApply(from, to, code, size, color) }) {
+                TextButton(onClick = { onApply(from, to, code, size, color, manufacturer) }) {
                     Text("Застосувати")
                 }
             },
@@ -344,6 +445,12 @@ fun FilterDialogStockIn(
                     AutoCompleteTextField(code, { code = it }, "Код", codes)
                     AutoCompleteTextField(size, { size = it }, "Розмір", sizes)
                     AutoCompleteTextField(color, { color = it }, "Колір", colors)
+                    AutoCompleteTextField(
+                            manufacturer,
+                            { manufacturer = it },
+                            "Виробник",
+                            manufacturers
+                    )
                 }
             }
     )
@@ -424,6 +531,65 @@ private fun AutoCompleteTextField(
                         }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LazyListScrollbar(
+        listState: LazyListState,
+        modifier: Modifier = Modifier,
+        thickness: Dp = 4.dp
+) {
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = modifier) {
+        val totalItems = listState.layoutInfo.totalItemsCount
+        val visibleItems = listState.layoutInfo.visibleItemsInfo.size
+
+        if (totalItems == 0 || visibleItems == 0) return@BoxWithConstraints
+
+        val barHeightPx = constraints.maxHeight.toFloat()
+        val proportionVisible = visibleItems.toFloat() / totalItems.toFloat()
+        val minThumbHeightPx = with(density) { 6.dp.toPx() }
+        val thumbHeightPx = maxOf(barHeightPx * proportionVisible, minThumbHeightPx)
+
+        val maxScrollIndex = (totalItems - visibleItems).coerceAtLeast(1)
+        val scrollProgress by remember {
+            derivedStateOf { listState.firstVisibleItemIndex.toFloat() / maxScrollIndex.toFloat() }
+        }
+
+        val maxOffsetPx = barHeightPx - thumbHeightPx
+        val offsetPx = maxOffsetPx * scrollProgress
+
+        val thumbHeightDp = with(density) { thumbHeightPx.toDp() }
+        val offsetDp = with(density) { offsetPx.toDp() }
+
+        Box(
+                modifier =
+                        Modifier.fillMaxHeight()
+                                .width(thickness)
+                                .background(
+                                        color =
+                                                MaterialTheme.colorScheme.onSurface.copy(
+                                                        alpha = 0.08f
+                                                ),
+                                        shape = RoundedCornerShape(100)
+                                )
+        ) {
+            Box(
+                    modifier =
+                            Modifier.width(thickness)
+                                    .height(thumbHeightDp)
+                                    .offset(y = offsetDp)
+                                    .background(
+                                            color =
+                                                    MaterialTheme.colorScheme.primary.copy(
+                                                            alpha = 0.9f
+                                                    ),
+                                            shape = RoundedCornerShape(100)
+                                    )
+            )
         }
     }
 }

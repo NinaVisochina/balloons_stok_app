@@ -9,5 +9,6 @@ data class Balloon(
     val code: String,          // Код
     val size: String,          // Розмір
     val color: String,         // Колір
-    val price: Double          // Ціна
+    val price: Double,          // Ціна
+    val manufacturer: String = ""
 )

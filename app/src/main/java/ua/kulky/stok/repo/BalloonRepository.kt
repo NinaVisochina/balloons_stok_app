@@ -10,8 +10,8 @@ import ua.kulky.stok.data.entities.Sale
 import ua.kulky.stok.data.entities.StockIn
 import ua.kulky.stok.data.models.InventoryItem
 import ua.kulky.stok.data.models.OperationFilter
-import ua.kulky.stok.data.models.SaleItem
 import ua.kulky.stok.data.models.StockInItem
+import ua.kulky.stok.data.models.SaleItem
 import java.time.LocalDate
 
 class BalloonRepository(
@@ -22,6 +22,7 @@ class BalloonRepository(
     // ----------------- Спостереження базових сутностей -----------------
 
     fun observeBalloons(): Flow<List<Balloon>> = balloonDao.observeAll()
+    fun observeManufacturers(): Flow<List<String>> = balloonDao.observeManufacturers()
 
     // ----------------- Додавання/оновлення сутностей -----------------
 
@@ -36,32 +37,53 @@ class BalloonRepository(
     }
 
     /**
-     * Якщо кульки (code+size+color) нема — створюємо; якщо є й ціна > 0 та змінилась — оновлюємо.
+     * Якщо кульки (code+size+color+manufacturer) нема — створюємо;
+     * якщо є й price > 0 та змінився — оновлюємо.
      * Повертає id кульки.
      */
-    suspend fun ensureBalloon(code: String, size: String, color: String, price: Double): Long {
-        val existing = balloonDao.findByAttrs(code.trim(), size.trim(), color.trim())
+    suspend fun ensureBalloon(
+        code: String,
+        size: String,
+        color: String,
+        price: Double,
+        manufacturer: String
+    ): Long {
+        val codeT = code.trim()
+        val sizeT = size.trim()
+        val colorT = color.trim()
+        val manT  = manufacturer.trim()
+
+        val existing = balloonDao.findByAttrs(codeT, sizeT, colorT, manT)
         return if (existing != null) {
             val newPrice = if (price > 0.0) price else existing.price
-            if (newPrice != existing.price) {
-                balloonDao.update(existing.copy(price = newPrice))
+            if (newPrice != existing.price || existing.manufacturer != manT) {
+                balloonDao.update(existing.copy(price = newPrice, manufacturer = manT))
             }
             existing.id
         } else {
             balloonDao.insert(
                 Balloon(
-                    code = code.trim(),
-                    size = size.trim(),
-                    color = color.trim(),
-                    price = price.coerceAtLeast(0.0)
+                    code = codeT,
+                    size = sizeT,
+                    color = colorT,
+                    price = price.coerceAtLeast(0.0),
+                    manufacturer = manT
                 )
             )
         }
     }
 
     /** Зручне додавання приходу за атрибутами кульки */
-    suspend fun addStockSmart(code: String, size: String, color: String, price: Double, qty: Int, date: LocalDate) {
-        val id = ensureBalloon(code, size, color, price)
+    suspend fun addStockSmart(
+        code: String,
+        size: String,
+        color: String,
+        price: Double,
+        qty: Int,
+        date: LocalDate,
+        manufacturer: String
+    ) {
+        val id = ensureBalloon(code, size, color, price, manufacturer)
         addStockIn(id, qty, date)
     }
 
@@ -73,15 +95,17 @@ class BalloonRepository(
         price: Double,
         qty: Int,
         customer: String,
-        date: LocalDate
+        date: LocalDate,
+        manufacturer: String
     ) {
-        val id = ensureBalloon(code, size, color, price)
+        val id = ensureBalloon(code, size, color, price, manufacturer)
         addSale(id, qty, customer, date)
     }
 
     // ----------------- Інвентар (залишки) -----------------
-    // Обчислюємо Σ(in) та Σ(out) у пам'яті з потоків і сортуємо: код ↑, розмір 10→12→...
-    fun observeInventory(): Flow<List<InventoryItem>> =
+    // Обчислюємо Σ(in) та Σ(out) у пам'яті з потоків і сортуємо:
+    // 1) за виробником (A→Z), 2) за кодом (натуральне), 3) за розміром (натуральне)
+    fun observeInventory(selectedManufacturer: String? = null): Flow<List<InventoryItem>> =
         combine(
             balloonDao.observeAll(),
             stockInDao.observeAll(),
@@ -90,17 +114,31 @@ class BalloonRepository(
             val inById = ins.groupBy { it.balloonId }.mapValues { (_, list) -> list.sumOf { it.qty } }
             val outById = sales.groupBy { it.balloonId }.mapValues { (_, list) -> list.sumOf { it.qty } }
 
-            balloons.map { b ->
-                InventoryItem(
-                    balloonId = b.id,
-                    code = b.code,
-                    size = b.size,
-                    color = b.color,
-                    price = b.price,
-                    qtyIn = inById[b.id] ?: 0,
-                    qtyOut = outById[b.id] ?: 0
+            balloons.asSequence()
+                .filter { b ->
+                    selectedManufacturer.isNullOrBlank() ||
+                        b.manufacturer.equals(selectedManufacturer, ignoreCase = true)
+                }
+                .map { b ->
+                    InventoryItem(
+                        balloonId = b.id,
+                        code = b.code,
+                        size = b.size,
+                        color = b.color,
+                        price = b.price,
+                        manufacturer = b.manufacturer,
+                        qtyIn = inById[b.id] ?: 0,
+                        qtyOut = outById[b.id] ?: 0
+                    )
+                }
+                .sortedWith(
+                    compareBy<InventoryItem>(
+                        { it.manufacturer.lowercase() },
+                        { codeKey(it.code) },
+                        { sizeKey(it.size) }
+                    )
                 )
-            }.sortedWith(compareBy<InventoryItem>({ codeKey(it.code) }, { sizeKey(it.size) }))
+                .toList()
         }
 
     // ----------------- Історія приходу з фільтрами -----------------
@@ -118,14 +156,17 @@ class BalloonRepository(
                     code = b.code,
                     size = b.size,
                     color = b.color,
-                    price = b.price
+                    price = b.price,
+                    manufacturer = b.manufacturer
                 )
             }.filter { item ->
                 (filter.dateFrom == null || !item.date.isBefore(filter.dateFrom)) &&
                 (filter.dateTo == null || !item.date.isAfter(filter.dateTo)) &&
                 (filter.code.isNullOrBlank() || item.code.startsWith(filter.code, ignoreCase = true)) &&
                 (filter.size.isNullOrBlank() || item.size.equals(filter.size, ignoreCase = true)) &&
-                (filter.color.isNullOrBlank() || item.color.equals(filter.color, ignoreCase = true))
+                (filter.color.isNullOrBlank() || item.color.equals(filter.color, ignoreCase = true)) &&
+                (filter.manufacturer.isNullOrBlank() ||
+                        item.manufacturer.equals(filter.manufacturer, ignoreCase = true))
             }.sortedByDescending { it.date }
         }
 
@@ -145,7 +186,8 @@ class BalloonRepository(
                     code = b.code,
                     size = b.size,
                     color = b.color,
-                    price = b.price
+                    price = b.price,
+                    manufacturer = b.manufacturer
                 )
             }.filter { item ->
                 (filter.dateFrom == null || !item.date.isBefore(filter.dateFrom)) &&
@@ -153,7 +195,9 @@ class BalloonRepository(
                 (filter.customer.isNullOrBlank() || item.customer.contains(filter.customer, ignoreCase = true)) &&
                 (filter.code.isNullOrBlank() || item.code.startsWith(filter.code, ignoreCase = true)) &&
                 (filter.size.isNullOrBlank() || item.size.equals(filter.size, ignoreCase = true)) &&
-                (filter.color.isNullOrBlank() || item.color.equals(filter.color, ignoreCase = true))
+                (filter.color.isNullOrBlank() || item.color.equals(filter.color, ignoreCase = true)) &&
+                (filter.manufacturer.isNullOrBlank() ||
+                        item.manufacturer.equals(filter.manufacturer, ignoreCase = true))
             }.sortedByDescending { it.date }
         }
 
@@ -186,7 +230,8 @@ class BalloonRepository(
         code: String,
         size: String,
         color: String,
-        price: Double
+        price: Double,
+        manufacturer: String
     ) {
         val cur = balloonDao.getById(balloonId) ?: return
         balloonDao.update(
@@ -194,7 +239,8 @@ class BalloonRepository(
                 code = code.trim(),
                 size = size.trim(),
                 color = color.trim(),
-                price = price.coerceAtLeast(0.0)
+                price = price.coerceAtLeast(0.0),
+                manufacturer = manufacturer.trim()
             )
         )
     }
