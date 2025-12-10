@@ -75,6 +75,7 @@ fun StockInScreen(
     var showFilter by remember { mutableStateOf(false) }
     var fDateFrom by remember { mutableStateOf<LocalDate?>(null) }
     var fDateTo by remember { mutableStateOf<LocalDate?>(null) }
+    var filterSummary by remember { mutableStateOf("") }
     var fCode by remember { mutableStateOf("") }
     var fSize by remember { mutableStateOf("") }
     var fColor by remember { mutableStateOf("") }
@@ -205,7 +206,17 @@ fun StockInScreen(
                 // ---------- РЕЖИМ ІСТОРІЇ ----------
                 item { Button(onClick = { isAdding = true }) { Text("Додати прихід") } }
 
-                item { Button(onClick = { showFilter = true }) { Text("Фільтр") } }
+                item {
+                    Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = { showFilter = true }) { Text("Фільтр") }
+                        if (filterSummary.isNotBlank()) {
+                            Text(text = filterSummary, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
 
                 item { HorizontalDivider() }
                 item { Text("Історія приходу", style = MaterialTheme.typography.titleMedium) }
@@ -262,7 +273,7 @@ fun StockInScreen(
     }
 
     // ⬇⬇⬇ Далі – як і було, діалог лишається всередині StockInScreen
-    if (showFilter) {
+    /* if (showFilter) {
         FilterDialogStockIn(
                 initialFrom = fDateFrom,
                 initialTo = fDateTo,
@@ -289,6 +300,74 @@ fun StockInScreen(
                                     manufacturer = manufacturerF.ifBlank { null }
                             )
                     )
+                    showFilter = false
+                },
+                codes = codes,
+                sizes = sizes,
+                colors = colors,
+                manufacturers = manufacturers
+        )
+    } */
+    if (showFilter) {
+        FilterDialogStockIn(
+                initialFrom = fDateFrom,
+                initialTo = fDateTo,
+                initialCode = fCode,
+                initialSize = fSize,
+                initialColor = fColor,
+                initialManufacturer = fManufacturer,
+                onDismiss = {
+                    showFilter = false
+                    fDateFrom = null
+                    fDateTo = null
+                    fCode = ""
+                    fSize = ""
+                    fColor = ""
+                    fManufacturer = ""
+                    filterSummary = ""
+
+                    onFilter(
+                            OperationFilter(
+                                    dateFrom = null,
+                                    dateTo = null,
+                                    customer = null, // 🔹 для StockIn завжди null
+                                    code = null,
+                                    size = null,
+                                    color = null,
+                                    manufacturer = null
+                            )
+                    )
+                },
+                onApply = { from, to, codeF, sizeF, colorF, manufacturerF ->
+                    fDateFrom = from
+                    fDateTo = to
+                    fCode = codeF
+                    fSize = sizeF
+                    fColor = colorF
+                    fManufacturer = manufacturerF
+
+                    val parts = mutableListOf<String>()
+                    if (from != null || to != null) parts.add("дата")
+                    if (codeF.isNotBlank()) parts.add("код")
+                    if (sizeF.isNotBlank()) parts.add("розмір")
+                    if (colorF.isNotBlank()) parts.add("колір")
+                    if (manufacturerF.isNotBlank()) parts.add("виробник")
+
+                    filterSummary =
+                            if (parts.isEmpty()) "" else "Фільтр: " + parts.joinToString(", ")
+
+                    onFilter(
+                            OperationFilter(
+                                    dateFrom = from,
+                                    dateTo = to,
+                                    customer = null, // 🔹 тут теж null
+                                    code = codeF.ifBlank { null },
+                                    size = sizeF.ifBlank { null },
+                                    color = colorF.ifBlank { null },
+                                    manufacturer = manufacturerF.ifBlank { null }
+                            )
+                    )
+
                     showFilter = false
                 },
                 codes = codes,

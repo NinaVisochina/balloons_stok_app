@@ -77,6 +77,7 @@ fun SaleScreen(
     var fDateFrom by remember { mutableStateOf<LocalDate?>(null) }
     var fDateTo by remember { mutableStateOf<LocalDate?>(null) }
     var fCustomer by remember { mutableStateOf("") }
+    var filterSummary by remember { mutableStateOf("") }
     var fCode by remember { mutableStateOf("") }
     var fSize by remember { mutableStateOf("") }
     var fColor by remember { mutableStateOf("") }
@@ -99,195 +100,6 @@ fun SaleScreen(
                 items.groupBy { YearMonth.from(it.date) }.toSortedMap(compareByDescending { it })
             }
 
-    /*  LazyColumn(
-                modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
-                state = listState,
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item { Text("Продаж", style = MaterialTheme.typography.titleLarge) }
-
-            if (isAdding) {
-                // ---------- РЕЖИМ ДОДАВАННЯ ----------
-                item {
-                    Button(onClick = { isAdding = false }) { Text("Повернутися до історії продажу") }
-                }
-
-                // Форма з автопідказками
-                item {
-                    AutoCompleteTextField(
-                            value = code,
-                            onValueChange = { code = it },
-                            label = "Код",
-                            suggestions = codes
-                    )
-                }
-                item {
-                    AutoCompleteTextField(
-                            value = size,
-                            onValueChange = { size = it },
-                            label = "Розмір",
-                            suggestions = sizes
-                    )
-                }
-                item {
-                    AutoCompleteTextField(
-                            value = color,
-                            onValueChange = { color = it },
-                            label = "Колір",
-                            suggestions = colors
-                    )
-                }
-                item {
-                    AutoCompleteTextField(
-                            value = manufacturer,
-                            onValueChange = { manufacturer = it },
-                            label = "Виробник",
-                            suggestions = manufacturers
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                            value = price,
-                            onValueChange = { price = it },
-                            label = { Text("Ціна") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                            value = qty,
-                            onValueChange = { qty = it },
-                            label = { Text("Кількість") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                item {
-                    AutoCompleteTextField(
-                            value = customer,
-                            onValueChange = { customer = it },
-                            label = "Покупець",
-                            suggestions = customers
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                            value = dateStr,
-                            onValueChange = { dateStr = it },
-                            label = { Text("Дата (yyyy-MM-dd)") },
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                item {
-                    Button(
-                            enabled = (qty.toIntOrNull() ?: 0) > 0,
-                            onClick = {
-                                val p = price.toDoubleOrNull() ?: 0.0
-                                val q = qty.toIntOrNull() ?: 0
-                                val d =
-                                        runCatching { LocalDate.parse(dateStr) }
-                                                .getOrDefault(LocalDate.now())
-                                onSaleSmart(
-                                        code.trim(),
-                                        size.trim(),
-                                        color.trim(),
-                                        p,
-                                        q,
-                                        customer.trim(),
-                                        d,
-                                        manufacturer.trim()
-                                )
-                                // обнуляємо поля
-                                code = ""
-                                size = ""
-                                color = ""
-                                manufacturer = ""
-                                price = ""
-                                qty = ""
-                                customer = ""
-                                dateStr = LocalDate.now().toString()
-                            }
-                    ) { Text("Зберегти продаж") }
-                }
-            } else {
-                // ---------- РЕЖИМ ІСТОРІЇ ----------
-                item { Button(onClick = { isAdding = true }) { Text("Додати продаж") } }
-
-                item { Button(onClick = { showFilter = true }) { Text("Фільтр") } }
-
-                item { HorizontalDivider() }
-                item { Text("Історія продажів", style = MaterialTheme.typography.titleMedium) }
-
-                byMonth.forEach { (ym, monthItems) ->
-                    item(key = "m-$ym") {
-                        val mExpanded =
-                                monthExpanded.getOrPut(ym) {
-                                    false
-                                } // false = згорнуто за замовчуванням
-                        MonthHeader(ym, mExpanded) { monthExpanded[ym] = !mExpanded }
-                    }
-
-                    // ✅ показуємо дні ТІЛЬКИ якщо місяць розгорнутий
-                    if (monthExpanded[ym] == true) {
-                        val byDay =
-                                monthItems.groupBy { it.date }.toSortedMap(compareByDescending { it })
-                        byDay.forEach { (day, dayItems) ->
-                            item(key = "d-$day") {
-                                val dExpanded = dayExpanded.getOrPut(day) { false }
-                                DayHeader(day, dExpanded) { dayExpanded[day] = !dExpanded }
-                            }
-                            if (dayExpanded[day] == true) {
-                                items(dayItems, key = { it.id }) { e ->
-                                    HistoryCardSale(e, onEdit = onEdit, onDelete = onDelete)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showFilter) {
-            FilterDialogSale(
-                    initialFrom = fDateFrom,
-                    initialTo = fDateTo,
-                    initialCustomer = fCustomer,
-                    initialCode = fCode,
-                    initialSize = fSize,
-                    initialColor = fColor,
-                    initialManufacturer = fManufacturer,
-                    onDismiss = { showFilter = false },
-                    onApply = { from, to, cust, codeF, sizeF, colorF, manufacturerF ->
-                        fDateFrom = from
-                        fDateTo = to
-                        fCustomer = cust
-                        fCode = codeF
-                        fSize = sizeF
-                        fColor = colorF
-                        fManufacturer = manufacturerF
-                        onFilter(
-                                OperationFilter(
-                                        dateFrom = from,
-                                        dateTo = to,
-                                        customer = cust.ifBlank { null },
-                                        code = codeF.ifBlank { null },
-                                        size = sizeF.ifBlank { null },
-                                        color = colorF.ifBlank { null },
-                                        manufacturer = manufacturerF.ifBlank { null }
-                                )
-                        )
-                        showFilter = false
-                    },
-                    codes = codes,
-                    sizes = sizes,
-                    colors = colors,
-                    customers = customers,
-                    manufacturers = manufacturers
-            )
-        }
-    } */
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
                 modifier =
@@ -416,7 +228,17 @@ fun SaleScreen(
                 // ---------- РЕЖИМ ІСТОРІЇ ----------
                 item { Button(onClick = { isAdding = true }) { Text("Додати продаж") } }
 
-                item { Button(onClick = { showFilter = true }) { Text("Фільтр") } }
+                item {
+                    Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = { showFilter = true }) { Text("Фільтр") }
+                        if (filterSummary.isNotBlank()) {
+                            Text(text = filterSummary, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
 
                 item { HorizontalDivider() }
                 item { Text("Історія продажів", style = MaterialTheme.typography.titleMedium) }
@@ -483,7 +305,29 @@ fun SaleScreen(
                 initialSize = fSize,
                 initialColor = fColor,
                 initialManufacturer = fManufacturer,
-                onDismiss = { showFilter = false },
+                onDismiss = {
+                    // 🔹 Скидаємо фільтр
+                    showFilter = false
+                    fDateFrom = null
+                    fDateTo = null
+                    fCustomer = ""
+                    fCode = ""
+                    fSize = ""
+                    fColor = ""
+                    fManufacturer = ""
+                    filterSummary = ""
+                    onFilter(
+                            OperationFilter(
+                                    dateFrom = null,
+                                    dateTo = null,
+                                    customer = null,
+                                    code = null,
+                                    size = null,
+                                    color = null,
+                                    manufacturer = null
+                            )
+                    )
+                },
                 onApply = { from, to, cust, codeF, sizeF, colorF, manufacturerF ->
                     fDateFrom = from
                     fDateTo = to
@@ -492,6 +336,19 @@ fun SaleScreen(
                     fSize = sizeF
                     fColor = colorF
                     fManufacturer = manufacturerF
+
+                    // 🔹 Формуємо текст, у яких полях є фільтр
+                    val parts = mutableListOf<String>()
+                    if (from != null || to != null) parts.add("дата")
+                    if (cust.isNotBlank()) parts.add("покупець")
+                    if (codeF.isNotBlank()) parts.add("код")
+                    if (sizeF.isNotBlank()) parts.add("розмір")
+                    if (colorF.isNotBlank()) parts.add("колір")
+                    if (manufacturerF.isNotBlank()) parts.add("виробник")
+
+                    filterSummary =
+                            if (parts.isEmpty()) "" else "Фільтр: " + parts.joinToString(", ")
+
                     onFilter(
                             OperationFilter(
                                     dateFrom = from,

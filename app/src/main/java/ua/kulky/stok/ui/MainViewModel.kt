@@ -192,6 +192,26 @@ class MainViewModel(private val repo: BalloonRepository) : ViewModel() {
                 repo.deleteBalloonCascade(balloonId)
                 refreshInventory()
             }
+    fun canSell(
+            code: String,
+            size: String,
+            color: String,
+            manufacturer: String,
+            qty: Int
+    ): Boolean {
+        if (qty <= 0) return false
+
+        val inv =
+                _state.value.inventory.firstOrNull { item ->
+                    item.code == code.trim() &&
+                            item.size == size.trim() &&
+                            item.color == color.trim() &&
+                            item.manufacturer == manufacturer.trim()
+                }
+
+        val available = inv?.let { it.qtyIn - it.qtyOut } ?: 0
+        return available >= qty
+    }
 
     private fun refreshInventory() {
         // Потоки самі оновлять стейт; метод залишено для симетрії викликів.
